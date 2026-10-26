@@ -30,7 +30,7 @@ top of this.
    stuck.
 5. **Open the pull request.** Commit with a clear message, push, and open it
    with `gh pr create`. In the description: what changed and why, in plain
-   words, and which pages to look at. Request a review from @@REVIEWER@@.
+   words, and which pages to look at. @@REVIEWER@@
 6. @@SHIP_STEP@@
 7. **Tell me** the pull request link and what happens next. I don't merge
    anything; the reviewer does.

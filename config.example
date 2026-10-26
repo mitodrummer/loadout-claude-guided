@@ -3,7 +3,8 @@
 # sourced by bash, so quote values with spaces.
 
 # GitHub username(s) Claude requests a review from on every pull request,
-# comma-separated. Required for the review step; without it Claude asks.
+# comma-separated. Leave unset when the repository assigns reviewers itself
+# (CODEOWNERS or a ruleset).
 #GUIDED_REVIEWER=octocat
 
 # After opening a pull request, keep going until it is ready for review:

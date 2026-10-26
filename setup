@@ -1,8 +1,8 @@
 #!/bin/sh
 # One-time setup after cloning this loadout into ~/.config/minimal/loadouts*/.
-# Asks for your name, email and reviewer, writes local/gitconfig and
-# local/config (both gitignored), and makes the loadout a default for
-# `min session activate`. Safe to re-run; it never overwrites local/.
+# Writes your settings to local/config (gitignored) and makes the loadout a
+# default for `min session activate`. Safe to re-run; it never overwrites
+# local/config.
 set -eu
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -14,31 +14,10 @@ case $here in
   *) echo "warning: $here is not under $config/loadouts*/, so min will not find it" >&2 ;;
 esac
 
-# ask "question" default: prints the answer, or the default when there is no
-# terminal or the reply is blank.
-ask() {
-  reply=''
-  if [ -t 0 ]; then
-    printf '%s%s: ' "$1" "${2:+ [$2]}" >&2
-    read -r reply
-  fi
-  printf '%s' "${reply:-$2}"
-}
-
 mkdir -p "$here/local"
 
-if [ ! -f "$here/local/gitconfig" ]; then
-  user=$(ask "Your name, as it should appear on your changes" "$(git config user.name 2>/dev/null || true)")
-  email=$(ask "Your email (the one on your GitHub account)" "$(git config user.email 2>/dev/null || true)")
-  printf '[user]\n\tname = %s\n\temail = %s\n' "${user:-Your Name}" "${email:-you@example.com}" \
-    >"$here/local/gitconfig"
-  echo "wrote local/gitconfig"
-fi
-
 if [ ! -f "$here/local/config" ]; then
-  reviewer=$(ask "GitHub username of the person who reviews your changes" "")
   cp "$here/config.example" "$here/local/config"
-  [ -n "$reviewer" ] && printf '\nGUIDED_REVIEWER=%s\n' "$reviewer" >>"$here/local/config"
   echo "wrote local/config"
 fi
 

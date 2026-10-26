@@ -17,10 +17,34 @@ if command -v gh >/dev/null 2>&1; then
   if ! gh auth status >/dev/null 2>&1 && [ -t 0 ]; then
     printf '\n%sSign in to GitHub%s so Claude can open pull requests for you.\n' "$bold" "$reset"
     printf 'Pick GitHub.com, HTTPS, and "Login with a web browser", then paste the code it shows.\n\n'
-    gh auth login || printf '\nGitHub sign-in did not finish. Ask Claude to help you sign in.\n'
+    gh auth login --scopes user:email || printf '\nGitHub sign-in did not finish. Ask Claude to help you sign in.\n'
   fi
   touch "$HOME/.gitconfig"
   gh auth setup-git 2>/dev/null || true
+fi
+
+# Commit as the GitHub account just signed in, unless dotfiles already set an
+# identity. The email is the account's primary one when gh's token can read
+# it, then its public one, then GitHub's noreply address, which still links
+# commits to the account.
+if gh auth status >/dev/null 2>&1 && [ -z "$(git config --global user.email)" ]; then
+  IFS=$'\t' read -r gh_login gh_id gh_name gh_email < <(
+    gh api user --jq '[.login, .id, (.name // ""), (.email // "")] | @tsv' 2>/dev/null)
+  if [ -n "${gh_login:-}" ]; then
+    primary="$(gh api user/emails --jq 'map(select(.primary))[0].email // empty' 2>/dev/null)" ||
+      primary=""
+    git config --global user.name "${gh_name:-$gh_login}"
+    git config --global user.email "${primary:-${gh_email:-$gh_id+$gh_login@users.noreply.github.com}}"
+  fi
+fi
+
+# Claude Code asks whether to trust every folder it hasn't seen, and each
+# session's project folder is new. Activating the project is that decision.
+if command -v jq >/dev/null 2>&1; then
+  cj="$HOME/.claude.json"
+  [ -f "$cj" ] || echo '{}' >"$cj"
+  jq --arg p "$PWD" '.projects[$p].hasTrustDialogAccepted = true' "$cj" >"$cj.tmp" &&
+    mv "$cj.tmp" "$cj"
 fi
 
 origin_url="$(git remote get-url origin 2>/dev/null || true)"
@@ -32,9 +56,9 @@ template="$HOME/.local/share/claude-guided/CLAUDE.md.in"
 if [ -f "$template" ]; then
   reviewer="${GUIDED_REVIEWER// /}"
   if [ -n "$reviewer" ]; then
-    reviewer_text="@${reviewer//,/, @} (\`gh pr create --reviewer $reviewer\`)"
+    reviewer_text="Request a review from @${reviewer//,/, @} (\`--reviewer $reviewer\`)."
   else
-    reviewer_text="(no reviewer is set: ask me who should review, once, and use that for the rest of the session)"
+    reviewer_text="Don't request reviewers; the repository assigns them."
   fi
   if [ "${GUIDED_AUTOSHIP:-true}" = true ]; then
     ship="**Get it ready for review.** If the project has a \`/shipit\` command, run it. Otherwise watch the checks (\`gh pr checks --watch\`), fix anything that fails, and address automated review comments, until the checks pass."

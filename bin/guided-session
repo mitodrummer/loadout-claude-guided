@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Runs at the first prompt of `min session attach` (the loadout's
+# PROMPT_COMMAND): signs in to GitHub, writes ~/.claude/CLAUDE.md from your
+# settings, and starts Claude Code. Quitting Claude leaves a plain shell.
+#
+# Not `set -e`: a failed step must still get the user to Claude.
+set -uo pipefail
+
+# shellcheck source=/dev/null
+[ -f "$HOME/.config/claude-guided/config" ] && . "$HOME/.config/claude-guided/config"
+
+bold='' reset=''
+if [ -t 1 ]; then bold=$'\e[1m' reset=$'\e[0m'; fi
+
+# git over HTTPS through gh, since the sandbox has no SSH keys.
+if command -v gh >/dev/null 2>&1; then
+  if ! gh auth status >/dev/null 2>&1 && [ -t 0 ]; then
+    printf '\n%sSign in to GitHub%s so Claude can open pull requests for you.\n' "$bold" "$reset"
+    printf 'Pick GitHub.com, HTTPS, and "Login with a web browser", then paste the code it shows.\n\n'
+    gh auth login || printf '\nGitHub sign-in did not finish. Ask Claude to help you sign in.\n'
+  fi
+  touch "$HOME/.gitconfig"
+  gh auth setup-git 2>/dev/null || true
+fi
+
+origin_url="$(git remote get-url origin 2>/dev/null || true)"
+case "$origin_url" in
+  git@github.com:*) git remote set-url origin "https://github.com/${origin_url#git@github.com:}" ;;
+esac
+
+template="$HOME/.local/share/claude-guided/CLAUDE.md.in"
+if [ -f "$template" ]; then
+  reviewer="${GUIDED_REVIEWER// /}"
+  if [ -n "$reviewer" ]; then
+    reviewer_text="@${reviewer//,/, @} (\`gh pr create --reviewer $reviewer\`)"
+  else
+    reviewer_text="(no reviewer is set: ask me who should review, once, and use that for the rest of the session)"
+  fi
+  if [ "${GUIDED_AUTOSHIP:-true}" = true ]; then
+    ship="**Get it ready for review.** If the project has a \`/shipit\` command, run it. Otherwise watch the checks (\`gh pr checks --watch\`), fix anything that fails, and address automated review comments, until the checks pass."
+  else
+    ship="**Stop here** once the pull request is open; the reviewer takes it from there."
+  fi
+  mkdir -p "$HOME/.claude"
+  awk -v r="$reviewer_text" -v s="$ship" \
+    '{ gsub(/@@REVIEWER@@/, r); gsub(/@@SHIP_STEP@@/, s); print }' \
+    "$template" >"$HOME/.claude/CLAUDE.md"
+fi
+
+printf '\n%sHi! Tell Claude what you would like to change.%s\n' "$bold" "$reset"
+printf 'It will show you the result, then open a pull request for review.\n\n'
+
+read -ra extra <<<"${CLAUDE_ARGS:-}"
+bash "$HOME/.local/bin/claude-launch" --permission-mode "${GUIDED_PERMISSION_MODE:-auto}" ${extra[@]+"${extra[@]}"}
+
+printf '\nClaude has stopped. Type %sclaude-launch%s and press Enter to start it again.\n' "$bold" "$reset"

@@ -1,0 +1,46 @@
+# Working with me
+
+I'm not a programmer and I don't use git. I'll describe what I want changed,
+usually how something looks or reads. You make the change, show it to me, and
+get it reviewed. A project's own instructions (its CLAUDE.md) still apply on
+top of this.
+
+## How to talk to me
+
+- Plain words. No jargon unless I ask; if a technical word is unavoidable,
+  say what it means in one short phrase.
+- Never ask me to run a command, edit a file, or use git. Do it yourself.
+- Ask me only about what I want (wording, look, which option), never about
+  how to build it. When something could go two ways, show me both.
+- Keep updates short: what you changed, what I should look at, what's next.
+
+## How every change goes
+
+1. **Start fresh.** Before the first edit, switch to `main`, pull it, and
+   create a branch named after the change (`fix-footer-spacing`). One branch
+   and one pull request per request I make. Never commit to `main`.
+2. **Make the change**, following the project's conventions.
+3. **Show me.** For anything visible, run the project's dev server and give
+   me a link I can open in my own browser (the Minimal skills explain how to
+   reach a session's ports from the host), naming the page to look at. Take
+   screenshots yourself to check the result before you send me the link. Wait
+   for me to say it looks right before going on.
+4. **Check it.** Run the project's linters and the tests near what changed,
+   and fix what they find. Don't bother me with this unless something is
+   stuck.
+5. **Open the pull request.** Commit with a clear message, push, and open it
+   with `gh pr create`. In the description: what changed and why, in plain
+   words, and which pages to look at. Request a review from @@REVIEWER@@.
+6. @@SHIP_STEP@@
+7. **Tell me** the pull request link and what happens next. I don't merge
+   anything; the reviewer does.
+
+If I ask for a follow-up change on an open pull request, add it to the same
+branch, unless it's unrelated, in which case start a new one.
+
+## Never
+
+- Merge a pull request, push to `main`, or force-push.
+- Change anything outside the request (refactors, upgrades, cleanups) without
+  asking me first. Mention anything broken you notice instead.
+- Commit secrets, or print tokens or keys anywhere.

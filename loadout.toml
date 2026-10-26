@@ -1,0 +1,31 @@
+description = "Claude Code for people who don't write code: describe a change, review it in the browser, and Claude opens the pull request"
+
+packages = ["claude-code", "git", "gh", "jq", "ripgrep", "fd"]
+
+# Every source is under this loadout's directory, so it works wherever it is
+# cloned. Patched files land 0644; the hook below restores the exec bit.
+patches = [
+    { dest = ".local/bin/guided-session",                source = "$LOADOUT_ROOT/bin/guided-session", description = "attach: GitHub sign-in, then Claude Code" },
+    { dest = ".local/bin/claude-launch",                 source = "$LOADOUT_ROOT/bin/claude-launch",  description = "claude update, then the newest claude" },
+    { dest = ".local/share/claude-guided/CLAUDE.md.in",  source = "$LOADOUT_ROOT/share/CLAUDE.md.in", description = "how Claude works with you; filled in at attach" },
+
+    # Written by ./setup and gitignored. A missing source is skipped, so the
+    # loadout activates before setup has run.
+    { dest = ".gitconfig",                  source = "$LOADOUT_ROOT/local/gitconfig", description = "your git identity" },
+    { dest = ".config/claude-guided/config", source = "$LOADOUT_ROOT/local/config",   description = "your settings (see config.example)" },
+]
+
+[[lifecycle_hooks]]
+description = "Make the patched scripts executable and skip Claude Code's first-run onboarding"
+on_activate = { type = "inline", value = '''chmod +x "$HOME"/.local/bin/guided-session "$HOME"/.local/bin/claude-launch 2>/dev/null; [ -f "$HOME/.claude.json" ] || printf '{"hasCompletedOnboarding": true}\n' > "$HOME/.claude.json"''' }
+
+[vars]
+# The attach shell reads no rc files, so Claude starts from the first prompt.
+PROMPT_COMMAND = 'unset PROMPT_COMMAND; bash "$HOME/.local/bin/guided-session"'
+
+# Each is taken from your host shell when set and dropped otherwise.
+GH_TOKEN                = { inherit = true }
+CLAUDE_CODE_OAUTH_TOKEN = { inherit = true }
+ANTHROPIC_API_KEY       = { inherit = true }
+TERM                    = { inherit = true, default = "xterm-256color" }
+COLORTERM               = { inherit = true }

@@ -1,0 +1,21 @@
+# claude-guided settings. ./setup writes local/config from this, which the
+# loadout patches into the session as ~/.config/claude-guided/config. It is
+# sourced by bash, so quote values with spaces.
+
+# GitHub username(s) Claude requests a review from on every pull request,
+# comma-separated. Required for the review step; without it Claude asks.
+#GUIDED_REVIEWER=octocat
+
+# After opening a pull request, keep going until it is ready for review:
+# watch the checks, fix failures, and answer automated review comments. It
+# uses the repo's /shipit command when the repo has one. Set to false to stop
+# once the pull request is open.
+#GUIDED_AUTOSHIP=true
+
+# How much Claude asks before acting. `auto` lets it work without asking about
+# each command, which suits a sandboxed session; `acceptEdits` asks before
+# running commands.
+#GUIDED_PERMISSION_MODE=auto
+
+# Extra arguments for claude.
+#CLAUDE_ARGS=

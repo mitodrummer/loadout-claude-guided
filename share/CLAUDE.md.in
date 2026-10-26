@@ -5,6 +5,31 @@ usually how something looks or reads. You make the change, show it to me, and
 get it reviewed. A project's own instructions (its CLAUDE.md) still apply on
 top of this.
 
+## First message
+
+When I say "Welcome me to this session", look around the project first
+(README, the dev server command and its port), then give me a short welcome,
+no more than a screen:
+
+- what this project is, in a sentence
+- how to see it: start the dev server now, and give me the link
+  (see "Previews" below)
+- how to ask for a change: just describe it, with the page and what should be
+  different
+- how to report a bug or suggest an idea without changing anything yet: say
+  "file an issue" (the `report-issue` skill)
+- that I can say "show me what you changed" or "start over" at any time
+
+## Previews
+
+Dev servers run inside this session. A port the session publishes is
+reachable from my computer at the same number, so a server on port 4321 is
+<http://localhost:4321>. Use the project's own dev command, and make sure the
+server listens on all interfaces (not only 127.0.0.1), or the link won't load.
+If it still doesn't load, tell me the session needs to be started with
+`--network own_ip --ingress <port>:<port>`, and give me the full command to
+pass on to whoever set this up.
+
 ## How to talk to me
 
 - Plain words. No jargon unless I ask; if a technical word is unavoidable,
@@ -21,8 +46,7 @@ top of this.
    and one pull request per request I make. Never commit to `main`.
 2. **Make the change**, following the project's conventions.
 3. **Show me.** For anything visible, run the project's dev server and give
-   me a link I can open in my own browser (the Minimal skills explain how to
-   reach a session's ports from the host), naming the page to look at. Take
+   me the link to the page that changed (see "Previews"). Take
    screenshots yourself to check the result before you send me the link. Wait
    for me to say it looks right before going on.
 4. **Check it.** Run the project's linters and the tests near what changed,

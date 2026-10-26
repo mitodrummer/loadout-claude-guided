@@ -8,6 +8,7 @@ patches = [
     { dest = ".local/bin/guided-session",                source = "$LOADOUT_ROOT/bin/guided-session", description = "attach: GitHub sign-in, then Claude Code" },
     { dest = ".local/bin/claude-launch",                 source = "$LOADOUT_ROOT/bin/claude-launch",  description = "claude update, then the newest claude" },
     { dest = ".local/share/claude-guided/CLAUDE.md.in",  source = "$LOADOUT_ROOT/share/CLAUDE.md.in", description = "how Claude works with you; filled in at attach" },
+    { dest = ".claude/skills/report-issue/SKILL.md",     source = "$LOADOUT_ROOT/skills/report-issue/SKILL.md", description = "turns a bug or idea into a GitHub issue" },
 
     # Written by ./setup and gitignored. A missing source is skipped, so the
     # loadout activates before setup has run. The git identity comes from

@@ -84,6 +84,14 @@ printf '\n%sHi! Tell Claude what you would like to change.%s\n' "$bold" "$reset"
 printf 'It will show you the result, then open a pull request for review.\n\n'
 
 read -ra extra <<<"${CLAUDE_ARGS:-}"
+
+# The first attach opens with Claude's welcome (the "First message" section
+# of CLAUDE.md); later attaches go straight to the prompt.
+welcomed="$HOME/.local/state/claude-guided/welcomed"
+if [ ! -f "$welcomed" ]; then
+  mkdir -p "${welcomed%/*}" && touch "$welcomed"
+  extra+=("Welcome me to this session.")
+fi
 bash "$HOME/.local/bin/claude-launch" --permission-mode "${GUIDED_PERMISSION_MODE:-auto}" ${extra[@]+"${extra[@]}"}
 
 printf '\nClaude has stopped. Type %sclaude-launch%s and press Enter to start it again.\n' "$bold" "$reset"

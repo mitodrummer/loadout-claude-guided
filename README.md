@@ -17,6 +17,10 @@ Every change follows the same steps, set in the session's
 
 Claude never merges, pushes to `main`, or asks you to run a command.
 
+To report a bug or idea without changing anything, say "file an issue":
+Claude asks a couple of questions, checks it isn't already filed, shows you
+the draft, and opens it once you agree.
+
 ## Install
 
 Needs min 0.6.0 or later (`min --version`).
@@ -31,11 +35,18 @@ git clone https://github.com/mitodrummer/loadout-claude-guided \
 the project:
 
 ```sh
-min session activate --attach
+min session activate --network own_ip --ingress 4321:4321 --allow-subnets 0.0.0.0/0 --attach
 ```
 
-GitHub asks you to sign in through your browser, and your changes are
-committed under that account's name and email unless you set `GIT_USER_*`.
+`--ingress` makes the project's dev server (here on port 4321; use your
+project's port) open at <http://localhost:4321> on your computer, and
+`--allow-subnets` gives the session internet access. Without them Claude can
+still make changes, but you can't preview them.
+
+The first time, you sign in to GitHub and then to Claude, each by opening a
+link and entering a code; Claude then welcomes you with a short tour. Your
+changes are committed under your GitHub account's name and email unless you
+set `GIT_USER_*`.
 
 ## For the reviewer
 
@@ -57,8 +68,6 @@ only.
 | `CLAUDE_ARGS` | none | Extra arguments for claude |
 | `GIT_USER_NAME`, `GIT_USER_EMAIL` | your GitHub account | Your git identity for commits |
 
-Claude asks you to log in the first time it starts.
-
 ## Files
 
 | File | Purpose |
@@ -68,3 +77,4 @@ Claude asks you to log in the first time it starts.
 | `bin/guided-session` | At attach: GitHub sign-in and git identity, `CLAUDE.md`, then Claude |
 | `bin/claude-launch` | `claude update`, then the newest claude |
 | `share/CLAUDE.md.in` | How Claude works with you |
+| `skills/report-issue/` | Files a bug or idea as a GitHub issue |

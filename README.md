@@ -35,7 +35,7 @@ min session activate --attach
 ```
 
 GitHub asks you to sign in through your browser, and your changes are
-committed under that account.
+committed under that account's name and email unless you set `GIT_USER_*`.
 
 ## For the reviewer
 
@@ -55,6 +55,7 @@ only.
 | `GUIDED_AUTOSHIP` | `true` | Keep going after the pull request opens until the checks pass |
 | `GUIDED_PERMISSION_MODE` | `auto` | Claude Code's `--permission-mode` |
 | `CLAUDE_ARGS` | none | Extra arguments for claude |
+| `GIT_USER_NAME`, `GIT_USER_EMAIL` | your GitHub account | Your git identity for commits |
 
 Claude asks you to log in the first time it starts.
 

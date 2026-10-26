@@ -16,8 +16,11 @@ if [ -t 1 ]; then bold=$'\e[1m' reset=$'\e[0m'; fi
 if command -v gh >/dev/null 2>&1; then
   if ! gh auth status >/dev/null 2>&1 && [ -t 0 ]; then
     printf '\n%sSign in to GitHub%s so Claude can open pull requests for you.\n' "$bold" "$reset"
-    printf 'Pick GitHub.com, HTTPS, and "Login with a web browser", then paste the code it shows.\n\n'
-    gh auth login --scopes user:email || printf '\nGitHub sign-in did not finish. Ask Claude to help you sign in.\n'
+    printf 'Open %shttps://github.com/login/device%s in your browser and enter the code below.\n\n' "$bold" "$reset"
+    # The answers gh would ask for are fixed here. The session has no browser
+    # to open, so GH_BROWSER=true turns gh's attempt into a quiet no-op.
+    GH_BROWSER=true gh auth login --hostname github.com --git-protocol https --web \
+      --scopes user:email || printf '\nGitHub sign-in did not finish. Ask Claude to help you sign in.\n'
   fi
   touch "$HOME/.gitconfig"
   gh auth setup-git 2>/dev/null || true
@@ -59,7 +62,8 @@ esac
 
 template="$HOME/.local/share/claude-guided/CLAUDE.md.in"
 if [ -f "$template" ]; then
-  reviewer="${GUIDED_REVIEWER// /}"
+  reviewer="${GUIDED_REVIEWER:-}"
+  reviewer="${reviewer// /}"
   if [ -n "$reviewer" ]; then
     reviewer_text="Request a review from @${reviewer//,/, @} (\`--reviewer $reviewer\`)."
   else

@@ -62,7 +62,7 @@ QUERY='query($owner: String!, $name: String!, $number: Int!) {
           ... on CheckRun { name status conclusion }
           ... on StatusContext { context state }
         } } } } } }
-      reviews(last: 100) { pageInfo { hasPreviousPage } nodes { databaseId state author { __typename login } commit { oid } } }
+      reviews(last: 100) { pageInfo { hasPreviousPage } nodes { databaseId state submittedAt author { __typename login } commit { oid } } }
       reviewRequests(first: 20) { nodes { requestedReviewer {
         __typename ... on User { login } ... on Bot { login } ... on Team { name } } } }
       reviewThreads(first: 100) { pageInfo { hasNextPage } nodes { id isResolved isOutdated
@@ -104,7 +104,9 @@ def open_section($name):
      else {name: .context, s: (if .state == "PENDING" or .state == "EXPECTED" then "pending"
                                elif .state == "SUCCESS" then "pass" else "fail" end)}
      end] as $checks
-| ($p.reviews.nodes | map(select(.author != null)) | group_by(.author.login)) as $by_reviewer
+# Oldest first within each reviewer, so `last` is their newest review.
+| ($p.reviews.nodes | map(select(.author != null)) | sort_by(.submittedAt)
+   | group_by(.author.login) | map(sort_by(.submittedAt))) as $by_reviewer
 # A comment does not withdraw a request for changes; only a newer approval or
 # dismissal does, as on GitHub itself.
 | [$by_reviewer[]

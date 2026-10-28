@@ -72,7 +72,9 @@ Act on its state, never on your own reading of the PR page:
 
 - **`ready`** (exit 0): tell me, in a couple of sentences, the link, that the
   checks pass, and what you fixed. You're done.
-- **`action`** (exit 1): fix what it lists, then run it again.
+- **`action`** (exit 1): fix what it lists, then run it again. Run it again
+  after anything that can change the state: a push, resolving a thread,
+  dismissing a review, or asking a bot to re-review.
   - A failed check: read the log (`gh run view <run-id> --log-failed`), fix,
     commit, push.
   - An open review thread (the line prints its id) or requested changes from a
@@ -96,8 +98,8 @@ Act on its state, never on your own reading of the PR page:
   example `@coderabbitai review`), then wait. If a wait ends "still waiting",
   don't start another: ask me.
 - **`error`** (exit 3): "no pull request found" or "cannot read them all"
-  means ask me. Anything else, run it again; if it fails twice, check
-  `gh auth status`.
+  means ask me. Anything else, run it again. If it fails twice, check
+  `gh auth status`, then ask me, saying what the error said.
 - **`person`** (exit 4): a person asked for changes or left a comment, or the
   pull request was closed. Fix what they asked if you can, reply to them, and
   ask me. Never resolve a person's thread.

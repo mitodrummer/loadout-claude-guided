@@ -21,6 +21,61 @@ To report a bug or idea without changing anything, say "file an issue":
 Claude asks a couple of questions, checks it isn't already filed, shows you
 the draft, and opens it once you agree.
 
+## New to the terminal? Start here
+
+These steps set up a Mac (Apple Silicon, M1 or later) from nothing. The
+terminal is an app where you type commands: paste each command below, press
+Return, and wait for it to finish before the next one. The examples use
+[gominimal/webapp](https://github.com/gominimal/webapp); swap in the
+project you were invited to.
+
+1. **Install Ghostty**, the terminal app. Download it from
+   <https://ghostty.org/download>, drag it into Applications, and open it.
+   Everything below happens in its window.
+
+2. **Install Homebrew**, which installs the rest. It asks for your Mac
+   password (nothing shows as you type; that's normal) and may install
+   Apple's command line tools, which takes a few minutes.
+
+   ```sh
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+
+   When it finishes it prints **Next steps** with a couple of commands. Paste
+   and run those too, then close Ghostty and open it again.
+
+3. **Install the GitHub command line tool:**
+
+   ```sh
+   brew install gh
+   ```
+
+4. **Sign in to GitHub.** Choose GitHub.com, HTTPS, and "Login with a web
+   browser", then enter the code it shows in the browser page that opens.
+
+   ```sh
+   gh auth login
+   ```
+
+5. **Install Minimal:**
+
+   ```sh
+   curl --proto "=https" --tlsv1.2 -fsSL https://go.minimal.dev/stable | sh
+   ```
+
+   Close Ghostty and open it again, then check it worked: `min --version`
+   prints a version number.
+
+6. **Get the project** and go into its folder:
+
+   ```sh
+   gh repo clone gominimal/webapp ~/webapp
+   cd ~/webapp
+   ```
+
+Then continue with [Install](#install) below. Next time, open Ghostty, run
+`cd ~/webapp`, and run the `min session activate` command from Install.
+
 ## Install
 
 Needs min 0.6.0 or later (`min --version`).
@@ -32,7 +87,7 @@ git clone https://github.com/mitodrummer/loadout-claude-guided \
 ```
 
 `setup` writes your settings and makes this your default loadout. Then, in
-the project:
+the project's folder (`cd ~/webapp` in the example above):
 
 ```sh
 min session activate --network own_ip --ingress 4321:4321 --allow-subnets 0.0.0.0/0 --attach

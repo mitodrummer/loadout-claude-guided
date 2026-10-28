@@ -8,9 +8,9 @@
 #GUIDED_REVIEWER=octocat
 
 # After opening a pull request, keep going until it is ready for review:
-# watch the checks, fix failures, and answer automated review comments. It
-# uses the repo's /shipit command when the repo has one. Set to false to stop
-# once the pull request is open.
+# watch the checks, fix failures, and answer automated review comments
+# (share/CLAUDE.md.in describes the loop). Set to false to stop once the pull
+# request is open.
 #GUIDED_AUTOSHIP=true
 
 # How much Claude asks before acting. `auto` lets it work without asking about

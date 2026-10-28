@@ -13,7 +13,7 @@ Every change follows the same steps, set in the session's
 2. the change, previewed on the project's dev server, until you say it looks right
 3. linters and nearby tests
 4. a pull request in plain words, for review
-5. the checks watched and fixed until they pass (the repo's `/shipit` when it has one)
+5. the checks watched and fixed, and automated review comments answered, until both are clean
 
 Claude never merges, pushes to `main`, or asks you to run a command.
 
@@ -129,7 +129,6 @@ only.
 | --- | --- |
 | `loadout.toml` | Packages, patches, hook and variables |
 | `setup` | Writes `local/config` and adds the loadout to your defaults |
-| `bin/guided-session` | At attach: GitHub sign-in and git identity, `CLAUDE.md`, then Claude |
-| `bin/claude-launch` | `claude update`, then the newest claude |
+| `bin/guided-session` | At attach: GitHub and Claude sign-in, git identity, `CLAUDE.md`, then Claude |
 | `share/CLAUDE.md.in` | How Claude works with you |
 | `skills/report-issue/` | Files a bug or idea as a GitHub issue |

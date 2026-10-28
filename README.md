@@ -27,8 +27,8 @@ Needs min 0.6.0 or later (`min --version`).
 
 ```sh
 git clone https://github.com/mitodrummer/loadout-claude-guided \
-  ~/.config/minimal/loadouts-untrusted/claude-guided
-~/.config/minimal/loadouts-untrusted/claude-guided/setup
+  ~/.config/minimal/loadouts/claude-guided
+~/.config/minimal/loadouts/claude-guided/setup
 ```
 
 `setup` writes your settings and makes this your default loadout. Then, in

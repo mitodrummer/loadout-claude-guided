@@ -52,9 +52,10 @@ project you were invited to.
 
 4. **Sign in to GitHub.** Choose GitHub.com, HTTPS, and "Login with a web
    browser", then enter the code it shows in the browser page that opens.
+   `--scopes user:email` lets your commits carry your real email.
 
    ```sh
-   gh auth login
+   gh auth login --scopes user:email
    ```
 
 5. **Install Minimal:**
@@ -90,18 +91,20 @@ git clone https://github.com/mitodrummer/loadout-claude-guided \
 the project's folder (`cd ~/webapp` in the example above):
 
 ```sh
-min session activate --network own_ip --ingress 4321:4321 --allow-subnets 0.0.0.0/0 --attach
+GH_TOKEN="$(gh auth token)" min session activate --network own_ip --ingress 4321:4321 \
+  --allow-subnets 0.0.0.0/0 --attach
 ```
 
-`--ingress` makes the project's dev server (here on port 4321; use your
-project's port) open at <http://localhost:4321> on your computer, and
-`--allow-subnets` gives the session internet access. Without them Claude can
-still make changes, but you can't preview them.
+`GH_TOKEN="$(gh auth token)"` hands your GitHub sign-in from `gh auth login`
+on your Mac to the session, so you don't sign in again there. Without it, the
+session asks you to sign in to GitHub. `--ingress` makes the project's dev
+server (port 4321 for webapp; use your project's port) open at
+<http://localhost:4321> on your computer. `--allow-subnets` gives the session
+internet access, which Claude needs.
 
-The first time, you sign in to GitHub and then to Claude, each by opening a
-link and entering a code; Claude then welcomes you with a short tour. Your
-changes are committed under your GitHub account's name and email unless you
-set `GIT_USER_*`.
+The first time, you sign in to Claude by opening a link and entering a code,
+and Claude then welcomes you with a short tour. Your changes are committed
+under your GitHub account's name and email unless you set `GIT_USER_*`.
 
 ## For the reviewer
 

@@ -67,7 +67,7 @@ QUERY='query($owner: String!, $name: String!, $number: Int!) {
         __typename ... on User { login } ... on Bot { login } ... on Team { name } } } }
       reviewThreads(first: 100) { pageInfo { hasNextPage } nodes { id isResolved isOutdated
         comments(first: 1) { nodes { author { __typename login } path line } } } }
-      comments(last: 50) { nodes { author { login } body } }
+      comments(last: 100) { pageInfo { hasPreviousPage } nodes { author { login } body } }
     }
   }
 }'
@@ -135,7 +135,12 @@ def open_section($name):
      [$p.comments.nodes[] | select(.author.login == "github-actions"
         and (.body | startswith("## 🤖 Claude Code Review")))] | last
    end) as $claude
-| (if $claude == null then [] else
+| (if $claude_check == null or $claude_check.s == "pending" then []
+   elif $claude == null and $p.comments.pageInfo.hasPreviousPage then
+     ["claude-review finished, but its comment is not among the newest 100. Read it on the PR."]
+   elif $claude == null then
+     ["claude-review finished without a review comment. Read its run log."]
+   else
      [("Must fix", "Should fix") as $s | ($claude.body | open_section($s)) as $o
       | if $o == true then "claude-review has open \($s | ascii_downcase) findings"
         else empty end]
@@ -150,7 +155,7 @@ def open_section($name):
     (if $p.reviews.pageInfo.hasPreviousPage then "reviews" else empty end),
     (if $p.reviewThreads.pageInfo.hasNextPage then "review threads" else empty end)]) as $truncated
 | if ($truncated | length) > 0 then
-    ["error"] + [$truncated[] | "more than 100 \(.) on this pull request; pr-ready cannot read them all"]
+    ["error"] + [$truncated[] | "This pull request has more than 100 \(.). Read it on GitHub."]
   elif $p.state == "MERGED" then ["ready", "pull request is merged"]
   elif $p.state == "CLOSED" then ["person", "pull request was closed without merging"]
   elif ([$checks[] | select(.s == "fail")] | length) > 0 or ($threads | length) > 0
@@ -188,21 +193,31 @@ def open_section($name):
 
 check() {
   local url="" number repo json="" out why
-  if ! url=$(gh pr view ${pr:+"$pr"} --json url --jq .url 2>/dev/null) || [ -z "$url" ]; then
-    echo "STATE: error"
-    echo "- no pull request found${pr:+ for $pr}"
-    return 3
-  fi
-  # https://github.com/OWNER/NAME/pull/N
-  number=${url##*/}
-  repo=${url#https://github.com/}
-  repo=${repo%/pull/*}
-  if ! json=$(gh api graphql -F number="$number" -F owner="${repo%/*}" \
-    -F name="${repo#*/}" -f query="$QUERY" 2>/dev/null); then
-    why=$(jq -r '.errors[0].message // empty' <<<"$json" 2>/dev/null) || why=""
-    echo "STATE: error"
-    echo "- GitHub could not be read: ${why:-${json:-gh failed}}"
-    return 3
+  if [ -n "${PR_READY_FIXTURE:-}" ]; then
+    # Tests: evaluate a saved GraphQL reply instead of asking GitHub.
+    json=$(<"$PR_READY_FIXTURE")
+  else
+    if ! url=$(gh pr view ${pr:+"$pr"} --json url --jq .url 2>&1) || [ -z "$url" ]; then
+      echo "STATE: error"
+      case "$url" in
+        *"no pull requests found"* | *"Could not resolve"* | "")
+          echo "- no pull request found${pr:+ for $pr}" ;;
+        *) echo "- gh could not read the pull request: ${url%%$'\n'*}. Run gh auth status." ;;
+      esac
+      return 3
+    fi
+    # https://github.com/OWNER/NAME/pull/N
+    number=${url##*/}
+    repo=${url#https://github.com/}
+    repo=${repo%/pull/*}
+    # -f keeps owner and name strings; -F makes number the Int the query takes.
+    if ! json=$(gh api graphql -F number="$number" -f owner="${repo%/*}" \
+      -f name="${repo#*/}" -f query="$QUERY" 2>/dev/null); then
+      why=$(jq -r '.errors[0].message // empty' <<<"$json" 2>/dev/null) || why=""
+      echo "STATE: error"
+      echo "- GitHub could not be read: ${why:-${json:-gh failed}}"
+      return 3
+    fi
   fi
   if ! out=$(jq -r "$EVALUATE" <<<"$json" 2>&1); then
     echo "STATE: error"

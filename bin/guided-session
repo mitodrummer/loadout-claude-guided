@@ -70,7 +70,7 @@ if [ -f "$template" ]; then
     reviewer_text="Don't request reviewers; the repository assigns them."
   fi
   if [ "${GUIDED_AUTOSHIP:-true}" = true ]; then
-    ship="**Get it ready for review.** If the project has a \`/shipit\` command, run it. Otherwise watch the checks (\`gh pr checks --watch\`), fix anything that fails, and address automated review comments, until the checks pass."
+    ship="**Get it ready for review**, as \"Getting a pull request ready for review\" below describes."
   else
     ship="**Stop here** once the pull request is open; the reviewer takes it from there."
   fi
@@ -83,6 +83,14 @@ fi
 printf '\n%sHi! Tell Claude what you would like to change.%s\n' "$bold" "$reset"
 printf 'It will show you the result, then open a pull request for review.\n\n'
 
+# Sign in before Claude starts, so its first screen is the prompt rather than
+# a login screen.
+if [ -t 0 ] && ! claude auth status >/dev/null 2>&1; then
+  printf '%sSign in to Claude:%s a browser link and code follow.\n' "$bold" "$reset"
+  claude auth login || printf 'Claude sign-in did not finish; type /login inside Claude.\n'
+fi
+
+mode="${GUIDED_PERMISSION_MODE:-auto}"
 read -ra extra <<<"${CLAUDE_ARGS:-}"
 
 # The first attach opens with Claude's welcome (the "First message" section
@@ -92,6 +100,7 @@ if [ ! -f "$welcomed" ]; then
   mkdir -p "${welcomed%/*}" && touch "$welcomed"
   extra+=("Welcome me to this session.")
 fi
-bash "$HOME/.local/bin/claude-launch" --permission-mode "${GUIDED_PERMISSION_MODE:-auto}" ${extra[@]+"${extra[@]}"}
+claude --permission-mode "$mode" ${extra[@]+"${extra[@]}"}
 
-printf '\nClaude has stopped. Type %sclaude-launch%s and press Enter to start it again.\n' "$bold" "$reset"
+printf '\nClaude has stopped. Type %sclaude --permission-mode %s%s and press Enter to start it again.\n' \
+  "$bold" "$mode" "$reset"

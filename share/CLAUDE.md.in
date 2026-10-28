@@ -78,8 +78,8 @@ Act on its state, never on your own reading of the PR page:
   - An open review thread (the line prints its id) or requested changes from a
     bot: fix findings marked must-fix, critical, major, high or should-fix, one
     commit per fix, and skip nits unless they're trivial. Then close every bot
-    thread you're done with, fixed or not, since an open thread keeps the state
-    at `action`: reply first with why when you skip one, then resolve it with
+    thread you're done with, fixed or not, including ones marked `(outdated)`,
+    since an open thread keeps the state at `action`: reply first with why when you skip one, then resolve it with
     `gh api graphql -f query='mutation{resolveReviewThread(input:{threadId:"<id>"}){thread{isResolved}}}'`.
   - A bot reviewed the latest commit but its older request for changes stands:
     dismiss that review (the line prints its id) with
@@ -95,11 +95,12 @@ Act on its state, never on your own reading of the PR page:
   that bot **once** to review again, the way its own comments say to (for
   example `@coderabbitai review`), then wait. If a wait ends "still waiting",
   don't start another: ask me.
-- **`error`** (exit 3): "no pull request found" means ask me which pull
-  request. Anything else, run it again; if it fails twice, check
+- **`error`** (exit 3): "no pull request found" or "cannot read them all"
+  means ask me. Anything else, run it again; if it fails twice, check
   `gh auth status`.
-- **`person`** (exit 4): a person has to decide, or the pull request was
-  closed. Ask me.
+- **`person`** (exit 4): a person asked for changes or left a comment, or the
+  pull request was closed. Fix what they asked if you can, reply to them, and
+  ask me. Never resolve a person's thread.
 
 You end your turn in two cases only: the state is `ready`, or you need me.
 When you need me, ask one multiple-choice question with the options spelled

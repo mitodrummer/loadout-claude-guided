@@ -8,19 +8,18 @@
 # `STATE: <state>`; the lines after it say why. The exit code is the state:
 #
 #   0 ready    merged, or every check passed with nothing left open
-#   1 action   something to fix: a failed check, an open review thread,
+#   1 action   something to fix: a failed check, an open bot review thread,
 #              requested changes, a stale bot verdict to dismiss, a merge
 #              conflict, or open claude-review findings
 #   2 waiting  checks running, no checks yet, mergeability not computed, or a
 #              bot asked for changes on an older commit and has not re-reviewed
 #   3 error    GitHub could not be read
-#   4 person   only a person can move it: a person requested changes, or the
-#              pull request was closed without merging
+#   4 person   only a person can move it: a person requested changes or has an
+#              open thread, or the pull request was closed without merging
 #
 # --wait polls every 30 seconds while the state is `waiting`, for SECONDS at
 # most (default 1800), then prints the state it ends in. Run it in the
-# background so the session is woken when it exits. A wait that sees no checks
-# at all for its whole length ends `ready`: the repository runs none.
+# background so the session is woken when it exits.
 #
 # claude-review: when the PR has a `claude-review` check, its newest review
 # comment (github-actions, opening `## 🤖 Claude Code Review`) counts too. A
@@ -29,7 +28,11 @@ set -euo pipefail
 
 POLL_SECONDS=30
 
-usage() { sed -n '5,7p' "$0" >&2; exit 3; }
+usage() {
+  printf '%s\n' "usage: ${0##*/} [PR] [--wait [SECONDS]]" \
+    "exit 0 ready, 1 action, 2 waiting, 3 error, 4 person; see the header of $0" >&2
+  exit 3
+}
 
 pr=""
 wait_for=0
@@ -54,32 +57,43 @@ QUERY='query($owner: String!, $name: String!, $number: Int!) {
     pullRequest(number: $number) {
       url state mergeable headRefOid
       commits(last: 1) { nodes { commit {
-        statusCheckRollup { contexts(first: 100) { nodes {
+        statusCheckRollup { contexts(first: 100) { pageInfo { hasNextPage } nodes {
           __typename
           ... on CheckRun { name status conclusion }
           ... on StatusContext { context state }
         } } } } } }
-      reviews(last: 100) { nodes { databaseId state author { __typename login } commit { oid } } }
+      reviews(last: 100) { pageInfo { hasPreviousPage } nodes { databaseId state author { __typename login } commit { oid } } }
       reviewRequests(first: 20) { nodes { requestedReviewer {
         __typename ... on User { login } ... on Bot { login } ... on Team { name } } } }
-      reviewThreads(first: 100) { nodes { id isResolved isOutdated
-        comments(first: 1) { nodes { author { login } path line } } } }
+      reviewThreads(first: 100) { pageInfo { hasNextPage } nodes { id isResolved isOutdated
+        comments(first: 1) { nodes { author { __typename login } path line } } } }
       comments(last: 50) { nodes { author { login } body } }
     }
   }
 }'
 
 # jq over the PR: one `STATE` line, then the reasons. Precedence: closed or
-# merged, then what needs a person, then what Claude can fix, then what is
+# merged, then what Claude can fix, then what needs a person, then what is
 # still running.
 # shellcheck disable=SC2016 # jq variables, not shell ones
 EVALUATE='
 def is_bot: .author.__typename == "Bot";
-# A review section is open when it holds a list item. Headings may be any
-# level, so a section ends at the next heading of any level.
+# A review section is open when it holds a list item other than "None". It runs
+# to the next heading of the same or a higher level, and fenced code is ignored,
+# so a `#` line in a code block or a finding under its own sub-heading does not
+# end it early.
 def open_section($name):
-  [splits("\n(?=#+ )")] | map(select(test("^#+ [^\n]*" + $name))) | first // null
-  | if . == null then null else test("\n\\s*([-*]|[0-9]+\\.) ") end;
+  (gsub("```[^`]*```"; "") | split("\n")) as $lines
+  | [$lines | to_entries[] | select(.value | test("^#+ "))
+     | {i: .key, level: (.value | capture("^(?<h>#+)").h | length), text: .value}] as $headings
+  | ($headings | map(select(.text | test($name))) | first) as $h
+  | if $h == null then null else
+      ([$headings[] | select(.i > $h.i and .level <= $h.level) | .i] | first
+       // ($lines | length)) as $end
+      | [$lines[$h.i + 1:$end][] | select(test("^\\s*([-*]|[0-9]+\\.)\\s"))
+         | select(test("^\\s*([-*]|[0-9]+\\.)\\s+[_*]*none\\b"; "i") | not)]
+      | length > 0
+    end;
 .data.repository.pullRequest as $p
 | $p.headRefOid as $head
 | [($p.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])[]
@@ -107,8 +121,11 @@ def open_section($name):
 # The bot has not looked at the latest commit since asking for changes.
 | [$changes[] | select((.verdict | is_bot) and .last.commit.oid != $head) | .verdict]
   as $rereview
-| [$p.reviewThreads.nodes[] | select((.isResolved | not) and (.isOutdated | not))
-   | .comments.nodes[0] + {id}] as $threads
+# An outdated thread is still open until someone resolves it.
+| [$p.reviewThreads.nodes[] | select(.isResolved | not)
+   | .comments.nodes[0] + {id, outdated: .isOutdated}] as $all_threads
+| [$all_threads[] | select(is_bot)] as $threads
+| [$all_threads[] | select(is_bot | not)] as $person_threads
 | [$p.reviewRequests.nodes[].requestedReviewer | select(.__typename == "Bot") | .login]
   as $pending_bots
 | ([$checks[] | select(.name == "claude-review")] | first) as $claude_check
@@ -125,23 +142,32 @@ def open_section($name):
         then ["claude-review comment has no Must fix or Should fix section; read it"]
         else [] end)
    end) as $claude_findings
-| if $p.state == "MERGED" then ["ready", "pull request is merged"]
+# One page of each list is read. Evaluating a partial page could miss a failed
+# check, an old request for changes or an open thread, so say so instead.
+| ([(if $p.commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo.hasNextPage then "checks" else empty end),
+    (if $p.reviews.pageInfo.hasPreviousPage then "reviews" else empty end),
+    (if $p.reviewThreads.pageInfo.hasNextPage then "review threads" else empty end)]) as $truncated
+| if ($truncated | length) > 0 then
+    ["error"] + [$truncated[] | "more than 100 \(.) on this pull request; pr-ready cannot read them all"]
+  elif $p.state == "MERGED" then ["ready", "pull request is merged"]
   elif $p.state == "CLOSED" then ["person", "pull request was closed without merging"]
-  elif ($person_changes | length) > 0 then
-    ["person"] + [$person_changes[]
-                  | "\(.author.login) requested changes; answer them, then ask for a new review"]
   elif ([$checks[] | select(.s == "fail")] | length) > 0 or ($threads | length) > 0
        or ($bot_changes | length) > 0 or ($stale_verdicts | length) > 0
        or ($claude_findings | length) > 0 or $p.mergeable == "CONFLICTING" then
     ["action"]
     + [$checks[] | select(.s == "fail") | "check failed: \(.name)"]
     + [$threads[] | "open review thread from \(.author.login): \(.path):\(.line // "?")"
-                    + " (thread \(.id))"]
+                    + (if .outdated then " (outdated)" else "" end) + " (thread \(.id))"]
     + [$bot_changes[] | "\(.author.login) requested changes on the latest commit"]
     + [$stale_verdicts[] | "\(.author.login) reviewed the latest commit, but its older request"
                            + " for changes stands: dismiss review \(.databaseId)"]
     + $claude_findings
     + (if $p.mergeable == "CONFLICTING" then ["merge conflict with the base branch"] else [] end)
+  elif ($person_changes | length) > 0 or ($person_threads | length) > 0 then
+    ["person"]
+    + [$person_changes[] | "\(.author.login) requested changes; answer them, then ask for a new review"]
+    + [$person_threads[] | "open thread from \(.author.login), a person: \(.path):\(.line // "?");"
+                           + " answer it and leave it to them (thread \(.id))"]
   elif $p.mergeable == "UNKNOWN" then
     ["waiting", "GitHub is still working out whether the branch merges cleanly"]
   elif ([$checks[] | select(.s == "pending")] | length) > 0 then
@@ -150,8 +176,8 @@ def open_section($name):
     ["waiting", "no checks have reported on the latest commit yet"]
   elif ($rereview | length) > 0 or ($pending_bots | length) > 0 then
     ["waiting"]
-    + [$rereview[] | "\(.author.login) requested changes on an older commit; ask it once to"
-                     + " review the latest one (for example @\(.author.login) review), then wait"]
+    + [$rereview[] | "\(.author.login) requested changes on an older commit and has not reviewed"
+                     + " the latest one; if it does not re-review on push, ask it once, then wait"]
     + [$pending_bots[] | "\(.) review requested, not posted yet"]
   else ["ready", "\($checks | length) checks passed, nothing left open"]
   end
@@ -202,11 +228,6 @@ while [ "$wait_for" -gt 0 ] && [ "$status" -eq 2 ] && [ "$SECONDS" -lt "$deadlin
   out=$(check) || status=$?
 done
 if [ "$wait_for" -gt 0 ] && [ "$status" -eq 2 ]; then
-  if grep -q '^- no checks have reported' <<<"$out" && [ "$(grep -c '^- ' <<<"$out")" -eq 1 ]; then
-    echo "STATE: ready"
-    echo "- no checks reported in ${wait_for}s; this repository runs none on pull requests"
-    exit 0
-  fi
   printf '%s\n' "$out"
   echo "- still waiting after ${wait_for}s; this state is not changing on its own"
   exit 2

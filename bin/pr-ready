@@ -13,7 +13,7 @@
 #              conflict, or open claude-review findings
 #   2 waiting  checks running, no checks yet, mergeability not computed, or a
 #              bot asked for changes on an older commit and has not re-reviewed
-#   3 error    GitHub could not be read
+#   3 error    GitHub could not be read, or an unknown option
 #   4 person   only a person can move it: a person requested changes or has an
 #              open thread, or the pull request was closed without merging
 #
@@ -26,11 +26,11 @@
 # Must fix or Should fix section with list items in it is open.
 set -euo pipefail
 
-POLL_SECONDS=30
+POLL_SECONDS=${PR_READY_POLL_SECONDS:-30}
 
 usage() {
-  printf '%s\n' "usage: ${0##*/} [PR] [--wait [SECONDS]]" \
-    "exit 0 ready, 1 action, 2 waiting, 3 error, 4 person; see the header of $0" >&2
+  echo "STATE: error"
+  echo "- unknown option $1. Usage: ${0##*/} [PR] [--wait [SECONDS]]"
   exit 3
 }
 
@@ -45,7 +45,7 @@ while [ $# -gt 0 ]; do
         shift
       fi
       ;;
-    -*) usage ;;
+    -*) usage "$1" ;;
     *) pr=$1 ;;
   esac
   shift

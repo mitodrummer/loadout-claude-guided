@@ -6,6 +6,7 @@ packages = ["claude-code", "git", "gh", "jq", "ripgrep", "fd"]
 # cloned. Patched files land 0644; the hook below restores the exec bit.
 patches = [
     { dest = ".local/bin/guided-session",                source = "$LOADOUT_ROOT/bin/guided-session", description = "attach: GitHub sign-in, then Claude Code" },
+    { dest = ".local/bin/pr-ready",                      source = "$LOADOUT_ROOT/bin/pr-ready",       description = "whether a pull request is ready for review" },
     { dest = ".local/share/claude-guided/CLAUDE.md.in",  source = "$LOADOUT_ROOT/share/CLAUDE.md.in", description = "how Claude works with you; filled in at attach" },
     { dest = ".claude/skills/report-issue/SKILL.md",     source = "$LOADOUT_ROOT/skills/report-issue/SKILL.md", description = "turns a bug or idea into a GitHub issue" },
 
@@ -17,7 +18,7 @@ patches = [
 
 [[lifecycle_hooks]]
 description = "Make the patched scripts executable and skip Claude Code's first-run onboarding"
-on_activate = { type = "inline", value = '''chmod +x "$HOME"/.local/bin/guided-session 2>/dev/null; [ -f "$HOME/.claude.json" ] || printf '{"hasCompletedOnboarding": true}\n' > "$HOME/.claude.json"''' }
+on_activate = { type = "inline", value = '''chmod +x "$HOME"/.local/bin/guided-session "$HOME"/.local/bin/pr-ready 2>/dev/null; [ -f "$HOME/.claude.json" ] || printf '{"hasCompletedOnboarding": true}\n' > "$HOME/.claude.json"''' }
 
 [vars]
 # The attach shell reads no rc files, so Claude starts from the first prompt.

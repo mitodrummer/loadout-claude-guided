@@ -7,20 +7,29 @@
 # PR defaults to the current branch's pull request. The first output line is
 # `STATE: <state>`; the lines after it say why. The exit code is the state:
 #
-#   0 ready    every check passed, no open review thread, no reviewer waiting
-#   1 action   something to fix: a failed check, an open thread, requested
-#              changes from a bot, or a merge conflict
-#   2 waiting  checks still running, or a bot has not reviewed the latest commit
+#   0 ready    merged, or every check passed with nothing left open
+#   1 action   something to fix: a failed check, an open review thread,
+#              requested changes, a stale bot verdict to dismiss, a merge
+#              conflict, or open claude-review findings
+#   2 waiting  checks running, no checks yet, mergeability not computed, or a
+#              bot asked for changes on an older commit and has not re-reviewed
 #   3 error    GitHub could not be read
-#   4 person   only a person can move it: a person requested changes
+#   4 person   only a person can move it: a person requested changes, or the
+#              pull request was closed without merging
 #
 # --wait polls every 30 seconds while the state is `waiting`, for SECONDS at
 # most (default 1800), then prints the state it ends in. Run it in the
-# background so the session is woken when it exits.
+# background so the session is woken when it exits. A wait that sees no checks
+# at all for its whole length ends `ready`: the repository runs none.
+#
+# claude-review: when the PR has a `claude-review` check, its newest review
+# comment (github-actions, opening `## 🤖 Claude Code Review`) counts too. A
+# Must fix or Should fix section with list items in it is open.
 set -euo pipefail
 
 POLL_SECONDS=30
-NEW_COMMIT_GRACE_SECONDS=300
+
+usage() { sed -n '5,7p' "$0" >&2; exit 3; }
 
 pr=""
 wait_for=0
@@ -28,11 +37,12 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --wait)
       wait_for=1800
-      if [ $# -gt 1 ] && [ "${2#-}" = "$2" ] && [ "$2" -eq "$2" ] 2>/dev/null; then
-        wait_for=$2
+      if [ $# -gt 1 ] && [[ $2 =~ ^[0-9]+$ ]]; then
+        wait_for=$((10#$2))
         shift
       fi
       ;;
+    -*) usage ;;
     *) pr=$1 ;;
   esac
   shift
@@ -43,31 +53,36 @@ QUERY='query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       url state mergeable headRefOid
-      commits(last: 1) { nodes { commit { committedDate
+      commits(last: 1) { nodes { commit {
         statusCheckRollup { contexts(first: 100) { nodes {
           __typename
           ... on CheckRun { name status conclusion }
           ... on StatusContext { context state }
         } } } } } }
-      reviews(last: 100) { nodes { state author { __typename login } commit { oid } } }
+      reviews(last: 100) { nodes { databaseId state author { __typename login } commit { oid } } }
       reviewRequests(first: 20) { nodes { requestedReviewer {
         __typename ... on User { login } ... on Bot { login } ... on Team { name } } } }
-      reviewThreads(first: 100) { nodes { isResolved isOutdated
+      reviewThreads(first: 100) { nodes { id isResolved isOutdated
         comments(first: 1) { nodes { author { login } path line } } } }
+      comments(last: 50) { nodes { author { login } body } }
     }
   }
 }'
 
-# jq over the PR: one `STATE` line, then the reasons. Precedence: a closed PR,
-# then what needs a person, then what Claude can fix, then what is still
-# running.
+# jq over the PR: one `STATE` line, then the reasons. Precedence: closed or
+# merged, then what needs a person, then what Claude can fix, then what is
+# still running.
 # shellcheck disable=SC2016 # jq variables, not shell ones
 EVALUATE='
-def ago($t): (now - ($t | fromdateiso8601));
+def is_bot: .author.__typename == "Bot";
+# A review section is open when it holds a list item. Headings may be any
+# level, so a section ends at the next heading of any level.
+def open_section($name):
+  [splits("\n(?=#+ )")] | map(select(test("^#+ [^\n]*" + $name))) | first // null
+  | if . == null then null else test("\n\\s*([-*]|[0-9]+\\.) ") end;
 .data.repository.pullRequest as $p
 | $p.headRefOid as $head
-| ($p.commits.nodes[0].commit) as $c
-| [($c.statusCheckRollup.contexts.nodes // [])[]
+| [($p.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])[]
    | if .__typename == "CheckRun"
      then {name, s: (if .status != "COMPLETED" then "pending"
                      elif (.conclusion | IN("SUCCESS","NEUTRAL","SKIPPED")) then "pass"
@@ -75,49 +90,76 @@ def ago($t): (now - ($t | fromdateiso8601));
      else {name: .context, s: (if .state == "PENDING" or .state == "EXPECTED" then "pending"
                                elif .state == "SUCCESS" then "pass" else "fail" end)}
      end] as $checks
-| ($p.reviews.nodes | group_by(.author.login) | map(last)) as $latest
+| ($p.reviews.nodes | map(select(.author != null)) | group_by(.author.login)) as $by_reviewer
 # A comment does not withdraw a request for changes; only a newer approval or
 # dismissal does, as on GitHub itself.
-| [$p.reviews.nodes[] | select(.state | IN("APPROVED","CHANGES_REQUESTED","DISMISSED"))
-   | select(.author != null)] as $verdict_reviews
-| [$verdict_reviews | group_by(.author.login)[] | last
-   | select(.state == "CHANGES_REQUESTED")] as $changes
+| [$by_reviewer[]
+   | {last: last,
+      verdict: (map(select(.state | IN("APPROVED","CHANGES_REQUESTED","DISMISSED"))) | last)}
+   | select(.verdict.state == "CHANGES_REQUESTED")] as $changes
+| [$changes[] | select(.verdict | is_bot | not) | .verdict] as $person_changes
+| [$changes[] | select((.verdict | is_bot) and .verdict.commit.oid == $head) | .verdict]
+  as $bot_changes
+# The bot reviewed the latest commit and asked for nothing, but its older
+# request still stands: dismiss it.
+| [$changes[] | select((.verdict | is_bot) and .verdict.commit.oid != $head
+                       and .last.commit.oid == $head) | .verdict] as $stale_verdicts
+# The bot has not looked at the latest commit since asking for changes.
+| [$changes[] | select((.verdict | is_bot) and .last.commit.oid != $head) | .verdict]
+  as $rereview
 | [$p.reviewThreads.nodes[] | select((.isResolved | not) and (.isOutdated | not))
-   | .comments.nodes[0]] as $threads
-| [$latest[] | select(.author.__typename == "Bot" and .commit.oid != $head
-                      and .state != "CHANGES_REQUESTED")] as $stale_bots
-| [$p.reviewRequests.nodes[].requestedReviewer
-   | select(.__typename == "Bot") | .login] as $pending_bots
-| if $p.state != "OPEN" then ["ready", "pull request is \($p.state | ascii_downcase)"]
-  elif ($changes | map(select(.author.__typename == "User")) | length) > 0 then
-    ["person"] + [$changes[] | select(.author.__typename == "User")
+   | .comments.nodes[0] + {id}] as $threads
+| [$p.reviewRequests.nodes[].requestedReviewer | select(.__typename == "Bot") | .login]
+  as $pending_bots
+| ([$checks[] | select(.name == "claude-review")] | first) as $claude_check
+| (if $claude_check == null or $claude_check.s == "pending" then null else
+     [$p.comments.nodes[] | select(.author.login == "github-actions"
+        and (.body | startswith("## 🤖 Claude Code Review")))] | last
+   end) as $claude
+| (if $claude == null then [] else
+     [("Must fix", "Should fix") as $s | ($claude.body | open_section($s)) as $o
+      | if $o == true then "claude-review has open \($s | ascii_downcase) findings"
+        else empty end]
+     + (if ([("Must fix", "Should fix") as $s | $claude.body | open_section($s)]
+            | all(. == null))
+        then ["claude-review comment has no Must fix or Should fix section; read it"]
+        else [] end)
+   end) as $claude_findings
+| if $p.state == "MERGED" then ["ready", "pull request is merged"]
+  elif $p.state == "CLOSED" then ["person", "pull request was closed without merging"]
+  elif ($person_changes | length) > 0 then
+    ["person"] + [$person_changes[]
                   | "\(.author.login) requested changes; answer them, then ask for a new review"]
-  elif ([$checks[] | select(.s == "fail")] | length) > 0
-       or ($threads | length) > 0
-       or ($changes | length) > 0
-       or $p.mergeable == "CONFLICTING" then
+  elif ([$checks[] | select(.s == "fail")] | length) > 0 or ($threads | length) > 0
+       or ($bot_changes | length) > 0 or ($stale_verdicts | length) > 0
+       or ($claude_findings | length) > 0 or $p.mergeable == "CONFLICTING" then
     ["action"]
     + [$checks[] | select(.s == "fail") | "check failed: \(.name)"]
-    + [$threads[] | "open review thread from \(.author.login): \(.path):\(.line // "?")"]
-    + [$changes[] | "\(.author.login) requested changes on \(.commit.oid[0:8])"
-       + (if .commit.oid != $head then " (an older commit: ask it to review the latest one)"
-          else "" end)]
+    + [$threads[] | "open review thread from \(.author.login): \(.path):\(.line // "?")"
+                    + " (thread \(.id))"]
+    + [$bot_changes[] | "\(.author.login) requested changes on the latest commit"]
+    + [$stale_verdicts[] | "\(.author.login) reviewed the latest commit, but its older request"
+                           + " for changes stands: dismiss review \(.databaseId)"]
+    + $claude_findings
     + (if $p.mergeable == "CONFLICTING" then ["merge conflict with the base branch"] else [] end)
+  elif $p.mergeable == "UNKNOWN" then
+    ["waiting", "GitHub is still working out whether the branch merges cleanly"]
   elif ([$checks[] | select(.s == "pending")] | length) > 0 then
     ["waiting"] + [$checks[] | select(.s == "pending") | "check running: \(.name)"]
-  elif ($checks | length) == 0 and ago($c.committedDate) < $grace then
-    ["waiting", "no checks have started on the latest commit yet"]
-  elif ($stale_bots | length) > 0 or ($pending_bots | length) > 0 then
+  elif ($checks | length) == 0 then
+    ["waiting", "no checks have reported on the latest commit yet"]
+  elif ($rereview | length) > 0 or ($pending_bots | length) > 0 then
     ["waiting"]
-    + [$stale_bots[] | "\(.author.login) has not reviewed the latest commit yet"]
+    + [$rereview[] | "\(.author.login) requested changes on an older commit; ask it once to"
+                     + " review the latest one (for example @\(.author.login) review), then wait"]
     + [$pending_bots[] | "\(.) review requested, not posted yet"]
-  else ["ready", "\($checks | length) checks passed, no open review threads"]
+  else ["ready", "\($checks | length) checks passed, nothing left open"]
   end
 | "STATE: \(.[0])", "PR: \($p.url) (head \($head[0:8]))", (.[1:][] | "- \(.)")
 '
 
 check() {
-  local url="" number repo json=""
+  local url="" number repo json="" out why
   if ! url=$(gh pr view ${pr:+"$pr"} --json url --jq .url 2>/dev/null) || [ -z "$url" ]; then
     echo "STATE: error"
     echo "- no pull request found${pr:+ for $pr}"
@@ -129,14 +171,16 @@ check() {
   repo=${repo%/pull/*}
   if ! json=$(gh api graphql -F number="$number" -F owner="${repo%/*}" \
     -F name="${repo#*/}" -f query="$QUERY" 2>/dev/null); then
-    local why
     why=$(jq -r '.errors[0].message // empty' <<<"$json" 2>/dev/null) || why=""
     echo "STATE: error"
     echo "- GitHub could not be read: ${why:-${json:-gh failed}}"
     return 3
   fi
-  local out
-  out=$(jq -r --argjson grace "$NEW_COMMIT_GRACE_SECONDS" "$EVALUATE" <<<"$json")
+  if ! out=$(jq -r "$EVALUATE" <<<"$json" 2>&1); then
+    echo "STATE: error"
+    echo "- could not evaluate the pull request: $out"
+    return 3
+  fi
   printf '%s\n' "$out"
   case "$(head -n 1 <<<"$out")" in
     "STATE: ready") return 0 ;;
@@ -147,16 +191,25 @@ check() {
   esac
 }
 
+# With --wait, only the state the wait ends in is printed, so the first line
+# is always the answer.
 status=0
-check || status=$?
+out=$(check) || status=$?
 deadline=$((SECONDS + wait_for))
 while [ "$wait_for" -gt 0 ] && [ "$status" -eq 2 ] && [ "$SECONDS" -lt "$deadline" ]; do
   sleep "$POLL_SECONDS"
   status=0
   out=$(check) || status=$?
-  [ "$status" -eq 2 ] || { printf '%s\n' "$out"; break; }
 done
 if [ "$wait_for" -gt 0 ] && [ "$status" -eq 2 ]; then
-  echo "- still waiting after ${wait_for}s; run pr-ready --wait again"
+  if grep -q '^- no checks have reported' <<<"$out" && [ "$(grep -c '^- ' <<<"$out")" -eq 1 ]; then
+    echo "STATE: ready"
+    echo "- no checks reported in ${wait_for}s; this repository runs none on pull requests"
+    exit 0
+  fi
+  printf '%s\n' "$out"
+  echo "- still waiting after ${wait_for}s; this state is not changing on its own"
+  exit 2
 fi
+printf '%s\n' "$out"
 exit "$status"

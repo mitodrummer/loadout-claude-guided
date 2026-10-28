@@ -146,7 +146,7 @@ def open_section($name):
         else empty end]
      + (if ([("Must fix", "Should fix") as $s | $claude.body | open_section($s)]
             | all(. == null))
-        then ["claude-review comment has no Must fix or Should fix section; read it"]
+        then ["claude-review comment has no Must fix or Should fix section. Read it."]
         else [] end)
    end) as $claude_findings
 # One page of each list is read. Evaluating a partial page could miss a failed
@@ -167,14 +167,14 @@ def open_section($name):
                     + (if .outdated then " (outdated)" else "" end) + " (thread \(.id))"]
     + [$bot_changes[] | "\(.author.login) requested changes on the latest commit"]
     + [$stale_verdicts[] | "\(.author.login) reviewed the latest commit, but its older request"
-                           + " for changes stands: dismiss review \(.databaseId)"]
+                           + " for changes stands. Dismiss review \(.databaseId)."]
     + $claude_findings
     + (if $p.mergeable == "CONFLICTING" then ["merge conflict with the base branch"] else [] end)
   elif ($person_changes | length) > 0 or ($person_threads | length) > 0 then
     ["person"]
-    + [$person_changes[] | "\(.author.login) requested changes; answer them, then ask for a new review"]
-    + [$person_threads[] | "open thread from \(.author.login), a person: \(.path):\(.line // "?");"
-                           + " answer it and leave it to them (thread \(.id))"]
+    + [$person_changes[] | "\(.author.login) requested changes. Answer them, then ask for a new review."]
+    + [$person_threads[] | "open thread from \(.author.login), a person: \(.path):\(.line // "?")"
+                           + " (thread \(.id)). Answer it, and leave resolving it to them."]
   elif $p.mergeable == "UNKNOWN" then
     ["waiting", "GitHub is still working out whether the branch merges cleanly"]
   elif ([$checks[] | select(.s == "pending")] | length) > 0 then
@@ -183,8 +183,8 @@ def open_section($name):
     ["waiting", "no checks have reported on the latest commit yet"]
   elif ($rereview | length) > 0 or ($pending_bots | length) > 0 then
     ["waiting"]
-    + [$rereview[] | "\(.author.login) requested changes on an older commit and has not reviewed"
-                     + " the latest one; if it does not re-review on push, ask it once, then wait"]
+    + [$rereview[] | "\(.author.login) requested changes on an older commit. It has not reviewed"
+                     + " the latest one yet. If it does not re-review on push, ask it once, then wait."]
     + [$pending_bots[] | "\(.) review requested, not posted yet"]
   else ["ready", "\($checks | length) checks passed, nothing left open"]
   end
@@ -246,7 +246,7 @@ while [ "$wait_for" -gt 0 ] && [ "$status" -eq 2 ] && [ "$SECONDS" -lt "$deadlin
 done
 if [ "$wait_for" -gt 0 ] && [ "$status" -eq 2 ]; then
   printf '%s\n' "$out"
-  echo "- still waiting after ${wait_for}s; this state is not changing on its own"
+  echo "- The wait ran out after about ${wait_for}s. Checks or reviewers can still finish later."
   exit 2
 fi
 printf '%s\n' "$out"

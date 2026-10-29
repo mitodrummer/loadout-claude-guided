@@ -124,6 +124,9 @@ welcomed="$HOME/.local/state/claude-guided/welcomed"
 if [ ! -f "$welcomed" ]; then
   mkdir -p "${welcomed%/*}" && touch "$welcomed"
   extra+=("Welcome me to this session.")
+  # In auto mode, Claude Code's one-time notice about it can take the place
+  # of the welcome; any message after it gets the welcome instead.
+  printf 'If Claude does not greet you, type %shello%s and press Enter.\n\n' "$bold" "$reset"
 fi
 claude --permission-mode "$mode" ${extra[@]+"${extra[@]}"}
 

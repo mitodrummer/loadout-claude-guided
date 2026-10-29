@@ -13,7 +13,9 @@ no more than a screen:
 
 - what this project is, in a sentence
 - how to see it: start the dev server now, and give me the link
-  (see "Previews" below)
+  (see "Previews" below), and that to open a link from this window I hold
+  Cmd + Shift and click it (Shift lets the terminal open it instead of
+  Claude catching the click)
 - how to ask for a change: just describe it, with the page and what should be
   different
 - how to report a bug or suggest an idea without changing anything yet: say

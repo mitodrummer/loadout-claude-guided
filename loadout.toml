@@ -17,8 +17,8 @@ patches = [
 ]
 
 [[lifecycle_hooks]]
-description = "Make the patched scripts executable and skip Claude Code's first-run onboarding"
-on_activate = { type = "inline", value = '''chmod +x "$HOME"/.local/bin/guided-session "$HOME"/.local/bin/pr-ready 2>/dev/null; [ -f "$HOME/.claude.json" ] || printf '{"hasCompletedOnboarding": true}\n' > "$HOME/.claude.json"''' }
+description = "Make the patched scripts executable, skip Claude Code's first-run onboarding, and turn on full screen"
+on_activate = { type = "inline", value = '''chmod +x "$HOME"/.local/bin/guided-session "$HOME"/.local/bin/pr-ready 2>/dev/null; [ -f "$HOME/.claude.json" ] || printf '{"hasCompletedOnboarding": true}\n' > "$HOME/.claude.json"; [ -f "$HOME/.claude/settings.json" ] || { mkdir -p "$HOME/.claude" && printf '{"tui": "fullscreen"}\n' > "$HOME/.claude/settings.json"; }''' }
 
 [vars]
 # The attach shell reads no rc files, so Claude starts from the first prompt.

@@ -24,6 +24,11 @@ on_activate = { type = "inline", value = '''chmod +x "$HOME"/.local/bin/guided-s
 # The attach shell reads no rc files, so Claude starts from the first prompt.
 PROMPT_COMMAND = 'unset PROMPT_COMMAND; bash "$HOME/.local/bin/guided-session"'
 
+# Shows the minimal.dev webapp's "Sign in as test user / test staff" buttons
+# on its dev server, so signed-in and staff pages can be checked without
+# GitHub keys or email. Only `astro dev` reads it; other projects ignore it.
+DEV_TEST_SIGN_IN = "true"
+
 # Each is taken from your host shell when set and dropped otherwise.
 # GH_TOKEN is how a host `gh` sign-in reaches the session: activate with
 # GH_TOKEN="$(gh auth token)" and guided-session skips `gh auth login`.

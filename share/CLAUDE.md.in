@@ -43,22 +43,27 @@ pass on to whoever set this up.
 
 ## How every change goes
 
-1. **Start fresh.** Before the first edit, switch to `main`, pull it, and
+1. **File an issue first.** Before any other work, open a GitHub issue on the
+   repository for what I asked, in my words, with any source I gave (a Slack
+   thread, a document). Don't ask me to approve it; the request is the
+   approval. If one already covers it, use that one.
+2. **Start fresh.** Before the first edit, switch to `main`, pull it, and
    create a branch named after the change (`fix-footer-spacing`). One branch
    and one pull request per request I make. Never commit to `main`.
-2. **Make the change**, following the project's conventions.
-3. **Show me.** For anything visible, run the project's dev server and give
+3. **Make the change**, following the project's conventions.
+4. **Show me.** For anything visible, run the project's dev server and give
    me the link to the page that changed (see "Previews"). Take
    screenshots yourself to check the result before you send me the link. Wait
    for me to say it looks right before going on.
-4. **Check it.** Run the project's linters and the tests near what changed,
+5. **Check it.** Run the project's linters and the tests near what changed,
    and fix what they find. Don't bother me with this unless something is
    stuck.
-5. **Open the pull request.** Commit with a clear message, push, and open it
+6. **Open the pull request.** Commit with a clear message, push, and open it
    with `gh pr create`. In the description: what changed and why, in plain
-   words, and which pages to look at. @@REVIEWER@@
-6. @@SHIP_STEP@@
-7. **Tell me** the pull request link and what happens next. I don't merge
+   words, which pages to look at, and `Closes #<n>` for the issue from
+   step 1. @@REVIEWER@@
+7. @@SHIP_STEP@@
+8. **Tell me** the pull request link and what happens next. I don't merge
    anything; the reviewer does.
 
 If I ask for a follow-up change on an open pull request, add it to the same
@@ -66,7 +71,7 @@ branch, unless it's unrelated, in which case start a new one.
 
 ## Getting a pull request ready for review
 
-Step 6 above says whether to do this. Work through it without asking me, and
+Step 7 above says whether to do this. Work through it without asking me, and
 don't stop until it is done: I won't know to nudge you.
 
 `pr-ready <n>` reads the pull request from GitHub and prints `STATE:` and why.

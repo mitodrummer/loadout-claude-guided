@@ -132,7 +132,7 @@ only.
 | --- | --- |
 | `loadout.toml` | Packages, patches, hook and variables |
 | `setup` | Writes `local/config` and adds the loadout to your defaults |
-| `bin/guided-session` | At attach: GitHub and Claude sign-in, git identity, `CLAUDE.md`, then Claude |
+| `bin/guided-session` | At attach: GitHub and Claude sign-in, git identity, an update of `main` when nothing is in progress, `CLAUDE.md`, then Claude |
 | `bin/pr-ready` | Whether a pull request is ready for review, from GitHub: `ready`, `action`, `waiting`, `error` or `person` |
 | `share/CLAUDE.md.in` | How Claude works with you |
 | `skills/report-issue/` | Files a bug or idea as a GitHub issue |

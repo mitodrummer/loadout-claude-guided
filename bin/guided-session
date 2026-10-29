@@ -60,6 +60,27 @@ case "$origin_url" in
   git@github.com:*) git remote set-url origin "https://github.com/${origin_url#git@github.com:}" ;;
 esac
 
+# Bring the default branch up to date on every attach, so the preview shows
+# what was merged since last time. Work in progress is left exactly as it is:
+# a pull runs only on a clean default branch, and anything else is passed to
+# Claude below to mention.
+session_note=""
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  default_branch="$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)"
+  default_branch="${default_branch#origin/}"
+  default_branch="${default_branch:-main}"
+  branch="$(git branch --show-current)"
+  if [ "$branch" != "$default_branch" ]; then
+    session_note="The project is on the branch \`$branch\`, not \`$default_branch\`, so it was not updated: work from a previous visit may be in progress."
+  elif [ -n "$(git status --porcelain)" ]; then
+    session_note="The project has unsaved changes on \`$default_branch\`, so it was not updated: work from a previous visit may be in progress."
+  elif git pull --ff-only --quiet 2>/dev/null; then
+    printf 'Updated the project to the latest %s.\n' "$default_branch"
+  else
+    session_note="Updating \`$default_branch\` from GitHub at attach failed; run \`git pull --ff-only\` before the first change and say what went wrong if it fails again."
+  fi
+fi
+
 template="$HOME/.local/share/claude-guided/CLAUDE.md.in"
 if [ -f "$template" ]; then
   reviewer="${GUIDED_REVIEWER:-}"
@@ -78,6 +99,10 @@ if [ -f "$template" ]; then
   awk -v r="$reviewer_text" -v s="$ship" \
     '{ gsub(/@@REVIEWER@@/, r); gsub(/@@SHIP_STEP@@/, s); print }' \
     "$template" >"$HOME/.claude/CLAUDE.md"
+fi
+if [ -n "$session_note" ]; then
+  printf '\n## This session\n\n%s In your first reply, tell me this in plain words and ask whether to pick that work back up or start fresh from the latest version.\n' \
+    "$session_note" >>"$HOME/.claude/CLAUDE.md"
 fi
 
 printf '\n%sHi! Tell Claude what you would like to change.%s\n' "$bold" "$reset"

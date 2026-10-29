@@ -9,11 +9,12 @@ opens a pull request for your reviewer.
 Every change follows the same steps, set in the session's
 `~/.claude/CLAUDE.md` ([`share/CLAUDE.md.in`](share/CLAUDE.md.in)):
 
-1. a fresh branch from `main`, one per request
-2. the change, previewed on the project's dev server, until you say it looks right
-3. linters and nearby tests
-4. a pull request in plain words, for review
-5. the checks watched and fixed, and automated review comments answered, until both are clean
+1. a GitHub issue for the request, filed before any work starts
+2. a fresh branch from `main`, one per request
+3. the change, previewed on the project's dev server, until you say it looks right
+4. linters and nearby tests
+5. a pull request in plain words, linked to the issue, for review
+6. the checks watched and fixed, and automated review comments answered, until both are clean
 
 Claude never merges, pushes to `main`, or asks you to run a command.
 

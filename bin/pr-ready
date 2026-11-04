@@ -110,7 +110,8 @@ def security_findings:
       ["claude-review security review failed: \($s | ltrimstr("\n") | split(". ") | first)."
        + " Re-run the claude-review job."]
     elif ($s | test("too long for this comment")) then
-      ["claude-review security review is in its job log, not the comment. Read it there."]
+      ["claude-review security review is in its job log, not the comment. Read it there"
+       + " and fix what it reports."]
     elif ($s | lead | test("\\bno(\\W+\\w+){0,4}\\W+(vulnerabilit|findings\\b)"; "i"))
          and ($s | test("(?m)^#+\\s*((vuln|vulnerability|finding)\\b[^\\n]*\\d|\\d)"
                         + "|severity\\W+(high|medium)|\\((high|medium)\\)"; "i") | not) then []

@@ -97,8 +97,10 @@ def open_section($name):
     end;
 # The `## 🔒 Security Review` section closes the comment, and the
 # /security-review output inside it brings its own headings, so it runs to the
-# end. Its body is free text: it is clean when it says "no ... vulnerabilities"
-# or "no ... findings", a few words apart, and reports no vulnerability.
+# end. Its body is free text: it is clean when its first lines say "no ...
+# vulnerabilities" or "no ... findings", a few words apart, and nothing in it
+# reads as a numbered finding or a high or medium severity.
+def lead: [splits("\n") | select(test("\\S"))] | .[0:3] | join(" ");
 def security_findings:
   (split("\n## 🔒 Security Review\n") | if length > 1 then last else null end) as $s
   | if $s == null then []
@@ -109,8 +111,9 @@ def security_findings:
        + " Re-run the claude-review job."]
     elif ($s | test("too long for this comment")) then
       ["claude-review security review is in its job log, not the comment. Read it there."]
-    elif ($s | test("\\bno(\\W+\\w+){0,4}\\W+(vulnerabilit|findings\\b)"; "i"))
-         and ($s | test("(?m)^#+\\s*Vuln\\b|Severity:\\W*(high|medium)"; "i") | not) then []
+    elif ($s | lead | test("\\bno(\\W+\\w+){0,4}\\W+(vulnerabilit|findings\\b)"; "i"))
+         and ($s | test("(?m)^#+\\s*((vuln|vulnerability|finding)\\b[^\\n]*\\d|\\d)"
+                        + "|severity\\W+(high|medium)|\\((high|medium)\\)"; "i") | not) then []
     else ["claude-review security review reports findings. Read its Security Review section."]
     end;
 .data.repository.pullRequest as $p

@@ -23,7 +23,8 @@
 #
 # claude-review: when the PR has a `claude-review` check, its newest review
 # comment (github-actions, opening `## 🤖 Claude Code Review`) counts too. A
-# Must fix or Should fix section with list items in it is open.
+# Must fix or Should fix section with list items in it is open, and so is a
+# `## 🔒 Security Review` section unless it reports no vulnerabilities.
 set -euo pipefail
 
 POLL_SECONDS=${PR_READY_POLL_SECONDS:-30}
@@ -94,6 +95,28 @@ def open_section($name):
          | select(test("^\\s*([-*]|[0-9]+\\.)\\s+[_*]*none\\b"; "i") | not)]
       | length > 0
     end;
+# The `## 🔒 Security Review` section closes the comment, and the
+# /security-review output inside it brings its own headings, so it runs to the
+# end. Its body is free text: it is clean when its first lines say "no ...
+# vulnerabilities" or "no ... findings", a few words apart, and nothing in it
+# reads as a numbered finding or a high or medium severity.
+def lead: [splits("\n") | select(test("\\S"))] | .[0:3] | join(" ");
+def security_findings:
+  (split("\n## 🔒 Security Review\n") | if length > 1 then last else null end) as $s
+  | if $s == null then []
+    elif ($s | test("^\\s*Running…")) then
+      ["claude-review security review did not finish. Re-run the claude-review job."]
+    elif ($s | test("no security review yet")) then
+      ["claude-review security review failed: \($s | ltrimstr("\n") | split(". ") | first)."
+       + " Re-run the claude-review job."]
+    elif ($s | test("too long for this comment")) then
+      ["claude-review security review is in its job log, not the comment. Read it there"
+       + " and fix what it reports."]
+    elif ($s | lead | test("\\bno(\\W+\\w+){0,4}\\W+(vulnerabilit|findings\\b)"; "i"))
+         and ($s | test("(?m)^#+\\s*((vuln|vulnerability|finding)\\b[^\\n]*\\d|\\d)"
+                        + "|severity\\W+(high|medium)|\\((high|medium)\\)"; "i") | not) then []
+    else ["claude-review security review reports findings. Read its Security Review section."]
+    end;
 .data.repository.pullRequest as $p
 | $p.headRefOid as $head
 | [($p.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])[]
@@ -148,6 +171,7 @@ def open_section($name):
             | all(. == null))
         then ["claude-review comment has no Must fix or Should fix section. Read it."]
         else [] end)
+     + ($claude.body | security_findings)
    end) as $claude_findings
 # One page of each list is read. Evaluating a partial page could miss a failed
 # check, an old request for changes or an open thread, so say so instead.

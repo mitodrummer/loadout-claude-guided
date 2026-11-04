@@ -100,8 +100,9 @@ Act on its state, never on your own reading of the PR page:
     section reports, like a Must fix. One that didn't finish or failed: re-run
     the claude-review job (`gh run rerun <run-id>`). One in the job log: read
     it there (`gh run view <run-id> --log`), fix what it reports like a Must
-    fix, and if it reports nothing, ask me. If you think a finding isn't real,
-    or the section reports nothing yet stays open, ask me.
+    fix, and if it reports nothing, ask me. `gh pr checks <n>` links the
+    claude-review run; its id is the number after `/runs/`. If you think a
+    finding isn't real, or the section reports nothing yet stays open, ask me.
   - A merge conflict: merge the base branch, fix the conflict, push.
 - **`waiting`** (exit 2): run `pr-ready <n> --wait` **in the background** (the
   Bash tool's `run_in_background`), and let it wake you when the state
